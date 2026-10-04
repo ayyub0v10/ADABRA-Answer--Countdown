@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ADABRA • Home</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/mobile.css" />
+
+  <style>
+    .hero {
+      margin: 10px 0 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tagline {
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    .homeCard {
+      max-width: 880px;
+      margin: 0 auto;
+    }
+
+    .joinRow {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .roomInput {
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: 1px;
+      height: 48px;
+    }
+
+    .btn-cta {
+      height: 48px;
+      min-width: 140px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .mini {
+      font-size: 13px;
+      color: var(--muted2);
+      line-height: 1.4;
+    }
+
+    .how {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(160px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .howItem {
+      background: rgba(255, 255, 255, .05);
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      padding: 12px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .howTitle {
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+
+    @media (max-width: 760px) {
+      .joinRow {
+        grid-template-columns: 1fr;
+      }
+
+      .btn-cta {
+        width: 100%;
+      }
+
+      .how {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <div class="homeCard">
+      <div class="hero">
+        <h1 style="margin:0;">ADABRA</h1>
+        <div class="tagline">ADA Brain Ring Application</div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="margin-top:0;">
+          <div id="hint" class="mini">To join as a player enter the room code you received from the host.</div>
+        </div>
+        <div class="joinRow">
+          <input id="room" class="roomInput" inputmode="text" maxlength="6" placeholder="ROOM CODE" />
+          <button id="join" class="btn btn-primary btn-cta">Join</button>
+        </div>
+        <div class="row">
+          <div id="hint" class="mini">To join as a host click "HOST CONSOLE" button and create a room.</div>
+        </div>
+        <div class="actions">
+          <a class="btn btn-ghost" href="/host" style="text-decoration: none;">HOST CONSOLE</a>
+          <button id="paste" class="btn btn-ghost" type="button" style="display: none;">Paste code</button>
+          <span id="status" class="muted" style="align-self:center; display: none;">—</span>
+        </div>
+
+        <hr />
+
+        <h2 style="margin:0 0 8px 0;">How it works</h2>
+        <div class="how">
+          <div class="howItem">
+            <div class="howTitle">1) Host</div>
+            <div class="mini">Create a room in the Host Console.</div>
+          </div>
+          <div class="howItem">
+            <div class="howTitle">2) Share</div>
+            <div class="mini">Send the room code or player link to participants.</div>
+          </div>
+          <div class="howItem">
+            <div class="howTitle">3) Buzz</div>
+            <div class="mini">Players choose a table and buzz on the start signal.</div>
+          </div>
+        </div>
+
+        <section class="rulesSection" id="rules">
+          <div class="rulesCard">
+            <div class="rulesHeader">
+              <h2 class="rulesTitle">Game Rules & How to Play</h2>
+              <p class="rulesSubtitle">
+                ADABRA is a fast-paced, team-based quiz game that rewards knowledge, coordination, and speed.
+              </p>
+            </div>
+
+            <details class="rulesDetails">
+              <summary class="rulesSummary">
+                <span>Read the rules</span>
+                <span class="rulesChevron" aria-hidden="true">▾</span>
+              </summary>
+
+              <div class="rulesBody">
+                <div class="rulesGrid">
+                  <div class="rulesBlock">
+                    <h3>Teams & Roles</h3>
+                    <ul>
+                      <li>A game consists of <strong>2 to 6 teams</strong>.</li>
+                      <li>Each team appoints one <strong>captain</strong>.</li>
+                      <li>The captain makes the final decision on:
+                        <ul>
+                          <li>Who will answer the question, or</li>
+                          <li>Which answer will be submitted after a team brainstorm.</li>
+                        </ul>
+                      </li>
+                      <li>Each team also assigns a <strong>buzzer player</strong>, selected by the captain.</li>
+                    </ul>
+                  </div>
+
+                  <div class="rulesBlock">
+                    <h3>Devices</h3>
+                    <ul>
+                      <li><strong>One device per team</strong> is sufficient.</li>
+                      <li>This device is used exclusively by the buzzer player to press the <strong>Buzz</strong>
+                        button.</li>
+                      <li>The buzzer player should only press when the team is confident that:
+                        <ul>
+                          <li>A team member knows the answer, or</li>
+                          <li>The team’s final answer is ready after discussion.</li>
+                        </ul>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="rulesBlock">
+                    <h3>Game Flow</h3>
+                    <ul>
+                      <li>The host (presenter) creates the game room and controls the flow.</li>
+                      <li>For each question, the host sets a timer, visible on the shared game screen.</li>
+                      <li>All teams see the same question and countdown in real time.</li>
+                    </ul>
+                  </div>
+
+                  <div class="rulesBlock">
+                    <h3>Buzzing & Answering</h3>
+                    <ul>
+                      <li>The <strong>first team</strong> to press the Buzz button earns the right to answer.</li>
+                      <li>If that team answers correctly:
+                        <ul>
+                          <li>They score <strong>one point</strong>.</li>
+                          <li>All other teams lose the chance to answer that question.</li>
+                          <li>The game proceeds immediately to the next round.</li>
+                        </ul>
+                      </li>
+                      <li>If the buzzing team answers incorrectly:
+                        <ul>
+                          <li>Other teams may buzz in and attempt an answer while time remains.</li>
+                        </ul>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="rulesBlock">
+                    <h3>Time Rules</h3>
+                    <ul>
+                      <li>The timer applies to all teams.</li>
+                      <li>When the timer reaches zero:
+                        <ul>
+                          <li>No team may answer, regardless of buzz order.</li>
+                        </ul>
+                      </li>
+                      <li>Effective time management is critical—waiting too long can cost everyone the question.</li>
+                    </ul>
+                  </div>
+
+                  <div class="rulesBlock">
+                    <h3>Key Strategy</h3>
+                    <ul>
+                      <li><strong>Speed</strong> matters, but <strong>accuracy</strong> matters more.</li>
+                      <li>Buzzing too early without a solid answer is risky.</li>
+                      <li>Coordinated teamwork, efficient brainstorming, and quick decision-making win games.</li>
+                    </ul>
+
+                    <div class="rulesCallout">
+                      <strong>Press fast. Think smart. Use your time wisely.</strong><br />
+                      Good luck—and enjoy the game with ADABRA.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+
+      </div>
+    </div>
+    <footer class="app-footer">
+      Made with JS and <span class="heart">❤</span> by kamrandroid
+    </footer>
+  </div>
+
+  <script>
+    const roomEl = document.getElementById("room");
+    const joinBtn = document.getElementById("join");
+    const pasteBtn = document.getElementById("paste");
+    const statusEl = document.getElementById("status");
+
+    function setStatus(text, cls = "muted") {
+      statusEl.className = cls;
+      statusEl.textContent = text;
+    }
+
+    function normalize(code) {
+      return String(code || "")
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 6);
+    }
+
+    function goJoin() {
+      const code = normalize(roomEl.value);
+      roomEl.value = code;
+
+      if (!code) {
+        setStatus("Enter a room code.", "err");
+        roomEl.focus();
+        return;
+      }
+      setStatus("Joining…", "muted");
+      location.href = `/play?room=${encodeURIComponent(code)}`;
+    }
+
+    joinBtn.onclick = goJoin;
+
+    roomEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") goJoin();
+    });
+
+    pasteBtn.onclick = async () => {
+      try {
+        const txt = await navigator.clipboard.readText();
+        roomEl.value = normalize(txt);
+        setStatus("Pasted.", "ok");
+        roomEl.focus();
+      } catch {
+        setStatus("Paste failed. Click input and paste manually.", "err");
+      }
+    };
+
+    // small polish: if user has ?room=XYZ we auto-fill
+    const params = new URLSearchParams(location.search);
+    const q = params.get("room");
+    if (q) {
+      roomEl.value = normalize(q);
+      setStatus("Code prefilled.", "ok");
+    } else {
+      setStatus("Ready.", "muted");
+    }
+  </script>
+</body>
+
+</html>

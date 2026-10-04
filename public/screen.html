@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ADABRA</title>
+    <link rel="stylesheet" href="/css/app.css" />
+    <link rel="stylesheet" href="/css/screen.css" />
+</head>
+
+<body class="screen">
+    <div class="container">
+        <div class="topbar">
+            <div class="brand"><span class="brand-dot"></span>ADABRA</div>
+            <div class="muted">Spectator Screen</div>
+        </div>
+
+        <div class="card screenCard">
+            <div class="screenHeader">
+                <div class="roomBlock">
+                    <div class="muted">Room</div>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div id="roomCode" class="screenRoom">—</div>
+                        <img id="roomQr" alt="QR"
+                            style="width:100px; height:100px; border-radius:10px; background:#fff; padding:4px; display:none;" />
+                    </div>
+                </div>
+
+                <div class="phaseBlock">
+                    <div class="muted">Round</div>
+                    <div id="round" class="screenPhase">0</div>
+                </div>
+
+                <div class="timerBlock">
+    <div class="muted">Time</div>
+    <div id="time" class="screenTime" style="text-align:left;">00:00.0</div>
+</div>
+
+<div class="timerBlock">
+    <div class="muted">Answer</div>
+    <div id="answerTime" class="screenTime" style="text-align:left;">00:00.0</div>
+</div>
+</div>
+
+            <div id="lockedBanner" class="lockedBanner" style="display:none;">—</div>
+            <div id="timeUpBanner" class="lockedBanner err" style="display:none;">TIME IS UP!</div>
+
+            <div id="focusBanner" class="lockedBanner err" style="display:none;">
+                —
+            </div>
+            <div id="fairplayBanner" class="lockedBanner err" style="display:none;">
+                —
+            </div>
+            <div class="screenBody">
+                <div class="screenCol">
+                    <div class="muted" style="font-weight:900; letter-spacing:.4px;">Scoreboard</div>
+                    <div id="scoreboard" class="screenScoreboard"></div>
+                </div>
+
+                <div class="screenCol rightCol">
+                    <div class="muted" style="font-weight:900; letter-spacing:.4px;">Last buzz</div>
+                    <div id="lastBuzz" class="lastBuzzBig">—</div>
+
+                    <div class="muted" style="margin-top:14px;">Tip</div>
+                    <div class="tipText">Players open: <strong>/play</strong> and enter room code.</div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="app-footer">
+            Made with JS and <span class="heart">❤</span> by kamrandroid
+        </footer>
+    </div>
+
+    <div id="confettiWrap" class="confettiWrap"></div>
+
+    <div id="winnerOverlay" class="winnerOverlay" style="display:none;">
+        <div id="winnerText" class="winnerText">TEAM WON</div>
+    </div>
+
+    <style>
+        .winnerOverlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, .55);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 9999;
+        }
+
+        .winnerText {
+            font-weight: 900;
+            letter-spacing: .6px;
+            text-transform: uppercase;
+            font-size: clamp(32px, 6vw, 72px);
+            padding: 18px 28px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, .06);
+            border: 1px solid rgba(255, 255, 255, .14);
+            text-align: center;
+        }
+    </style>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        socket.on("errorMsg", (text) => {
+            console.warn("Screen errorMsg:", text);
+        });
+
+        const roomCodeEl = document.getElementById("roomCode");
+        const roundEl = document.getElementById("round");
+        const timeEl = document.getElementById("time");
+        const answerTimeEl = document.getElementById("answerTime");
+        let screenTimerState = null;
+        let screenAnswerTimerState = null;
+        const lastBuzzEl = document.getElementById("lastBuzz");
+        const lockedBannerEl = document.getElementById("lockedBanner");
+        const scoreboardEl = document.getElementById("scoreboard");
+        const timeUpBannerEl = document.getElementById("timeUpBanner");
+        const focusBannerEl = document.getElementById("focusBanner");
+        const roomQrEl = document.getElementById("roomQr");
+
+        const winnerOverlayEl = document.getElementById("winnerOverlay");
+        const winnerTextEl = document.getElementById("winnerText");
+
+        let currentRoom = null;
+
+        function formatMs(ms) {
+            const m = Math.floor(ms / 60000);
+            const s = Math.floor((ms % 60000) / 1000);
+            const t = Math.floor((ms % 1000) / 10);
+            return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(t).padStart(2, "0")}`;
+        }
+
+        function updateTimerWarning(el, ms, phase, isTimeUp) {
+            const last3 = (phase === "armed" && ms <= 3000 && ms > 0);
+            const danger = Boolean(isTimeUp) || last3;
+            el.classList.toggle("timerDanger", danger);
+            el.classList.toggle("timerPulse", danger);
+        }
+
+        function getQueryRoom() {
+            const params = new URLSearchParams(location.search);
+            const r = params.get("room");
+            return r ? r.trim().toUpperCase() : "";
+        }
+
+        function teamNameFromState(state, teamId) {
+            const t = (state.teams || []).find(x => String(x.id) === String(teamId));
+            return t ? t.name : `Team ${teamId}`;
+        }
+
+        function renderScoreboard(teams) {
+            scoreboardEl.innerHTML = "";
+            const sorted = [...(teams || [])].sort((a, b) => (b.score || 0) - (a.score || 0));
+            for (const t of sorted) {
+                const row = document.createElement("div");
+                row.className = "screenTeamRow";
+                row.innerHTML = `
+          <div class="screenTeamName">
+            <span class="teamAvatar" style="margin-left:5px; background:${teamColor(t.id)}"></span>
+            <span style="margin-left:10px;">${t.name}</span>
+          </div>
+          <div class="screenTeamScore">${t.score}</div>
+        `;
+                scoreboardEl.appendChild(row);
+            }
+        }
+
+        function joinRoom(roomCode) {
+            currentRoom = roomCode;
+            roomCodeEl.textContent = roomCode || "—";
+
+            if (!roomCode) {
+                if (roomQrEl) roomQrEl.style.display = "none";
+                return;
+            }
+
+            const joinUrl = `${location.origin}/play?room=${encodeURIComponent(roomCode)}`;
+            const qrImgUrl = `https://quickchart.io/qr?size=120&margin=1&text=${encodeURIComponent(joinUrl)}`;
+
+            roomQrEl.src = qrImgUrl;
+            roomQrEl.style.display = "block";
+
+            socket.emit("joinRoom", { roomCode });
+        }
+
+        joinRoom(getQueryRoom());
+
+        function animateScreenTimers() {
+  const now = performance.now();
+
+  if (screenTimerState) {
+    const elapsed = screenTimerState.running
+      ? now - screenTimerState.updatedAt
+      : 0;
+
+    const remaining = Math.max(0, screenTimerState.value - elapsed);
+    timeEl.textContent = formatMs(remaining);
+  }
+
+  if (screenAnswerTimerState) {
+    const elapsed = screenAnswerTimerState.running
+      ? now - screenAnswerTimerState.updatedAt
+      : 0;
+
+    const remaining = Math.max(0, screenAnswerTimerState.value - elapsed);
+    answerTimeEl.textContent = formatMs(remaining);
+  }
+
+  requestAnimationFrame(animateScreenTimers);
+}
+
+animateScreenTimers();  
+        socket.on("roomState", (state) => {
+            if (!currentRoom || state.roomCode !== currentRoom) return;
+
+            // winner overlay
+            if (state.gameOver) {
+                winnerTextEl.textContent = state.winnerText || "GAME OVER";
+                winnerOverlayEl.style.display = "flex";
+            } else {
+                winnerOverlayEl.style.display = "none";
+            }
+
+            roundEl.textContent = String(state.roundNumber ?? 0);
+            screenTimerState = {
+  value: Number(state.remainingMs || 0),
+  updatedAt: performance.now(),
+  running: Boolean(state.timerRunning)
+};
+
+screenAnswerTimerState = {
+  value: Number(state.answerRemainingMs || 0),
+  updatedAt: performance.now(),
+  running: state.phase === "locked"
+};
+
+timeEl.textContent = formatMs(state.remainingMs || 0);
+answerTimeEl.textContent = formatMs(state.answerRemainingMs || 0);
+
+            const isTimeUp = Boolean(state.timeUpAt);
+            updateTimerWarning(timeEl, state.remainingMs || 0, state.phase, isTimeUp);
+            timeUpBannerEl.style.display = isTimeUp ? "block" : "none";
+
+            // Focus lost banner
+            const focusLocked = Array.isArray(state.focusLockedTeams) ? state.focusLockedTeams : [];
+            if (focusBannerEl) {
+                if ((state.phase === "armed" || state.phase === "locked") && focusLocked.length > 0) {
+                    const names = focusLocked.map(tid => teamNameFromState(state, tid));
+                    focusBannerEl.style.display = "block";
+                    focusBannerEl.textContent = `FOCUS LOST: ${names.join(", ")}`;
+                } else {
+                    focusBannerEl.style.display = "none";
+                }
+            }
+
+            renderScoreboard(state.teams);
+
+            if (!state.lastBuzz) {
+                lastBuzzEl.textContent = "—";
+            } else {
+                const name = teamNameFromState(state, state.lastBuzz.teamId);
+                const isFirst =
+                    state.phase === "locked" &&
+                    state.firstBuzzTeamId &&
+                    String(state.firstBuzzTeamId) === String(state.lastBuzz.teamId);
+
+                lastBuzzEl.textContent = isFirst ? `${name} buzzed first` : `${name} buzzed`;
+            }
+
+            if (state.phase === "locked") {
+                const answeringTeamId = state.lockedByTeamId || (state.lastBuzz && state.lastBuzz.teamId);
+                lockedBannerEl.style.display = "block";
+                lockedBannerEl.textContent = answeringTeamId
+                    ? `${teamNameFromState(state, answeringTeamId)} is answering`
+                    : "LOCKED — Team is answering";
+            } else {
+                lockedBannerEl.style.display = "none";
+            }
+
+            const fairplayBannerEl = document.getElementById("fairplayBanner");
+
+            const fs = new Set(state.falseStartTeams || []);
+            if (fs.size > 0) {
+                const names = [...fs].map(teamId => teamNameFromState(state, teamId));
+                fairplayBannerEl.style.display = "block";
+                fairplayBannerEl.textContent = `FALSE START: ${names.join(", ")} (locked this round)`;
+            } else {
+                fairplayBannerEl.style.display = "none";
+            }
+
+        });
+
+        const TEAM_COLORS = ["#7c5cff", "#31d3ff", "#19d17f", "#ffd400", "#ff5a00", "#ff3d88"];
+        function teamColor(teamId) {
+            const n = Number(teamId);
+            const i = Number.isFinite(n) ? ((n - 1) % TEAM_COLORS.length) : 0;
+            return TEAM_COLORS[i];
+        }
+
+        const confettiWrap = document.getElementById("confettiWrap");
+
+        function burstConfetti(color) {
+            if (!confettiWrap) return;
+            const w = window.innerWidth;
+            const x0 = w * 0.5;
+            for (let i = 0; i < 36; i++) {
+                const el = document.createElement("div");
+                el.className = "confetti";
+                el.style.background = color;
+                el.style.left = (x0 + (Math.random() * 240 - 120)) + "px";
+                el.style.top = (80 + Math.random() * 40) + "px";
+                el.style.transform = `rotate(${Math.random() * 180}deg)`;
+                confettiWrap.appendChild(el);
+                setTimeout(() => el.remove(), 1750);
+            }
+        }
+
+        socket.on("correctFx", ({ teamId }) => {
+            burstConfetti(teamColor(teamId));
+        });
+    </script>
+</body>
+
+</html>

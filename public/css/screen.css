@@ -1,0 +1,245 @@
+body.screen {
+    background:
+        radial-gradient(900px 520px at 18% 10%, rgba(124, 92, 255, .22), transparent 60%),
+        radial-gradient(900px 520px at 84% 18%, rgba(49, 211, 255, .18), transparent 60%),
+        linear-gradient(180deg, #070a14, #0b1020);
+}
+
+.screenCard {
+    padding: 22px;
+}
+
+.screenHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    grid-template-columns: 1fr 1fr 1.2fr;
+    gap: 14px;
+}
+
+.screenRoom {
+    font-size: 64px;
+    font-weight: 1000;
+    letter-spacing: 2px;
+}
+
+#round {
+    font-size: 64px;
+    font-weight: 1000;
+    letter-spacing: 2px;
+}
+
+.screenPhase {
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--muted);
+}
+
+.phaseBlock{
+  text-align: center;
+}
+
+.screenTime {
+    
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+
+    font-size: 64px;
+  font-weight: 1000;
+  letter-spacing: 2px;
+}
+
+.lockedBanner {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, .14);
+    background: rgba(255, 255, 255, .06);
+    text-align: center;
+    font-weight: 1000;
+    font-size: 22px;
+}
+
+.screenBody {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 16px;
+    align-items: start;
+}
+
+.screenScoreboard {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.screenTeamRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, .10);
+    background: rgba(255, 255, 255, .06);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.screenTeamName {
+    font-size: 24px;
+    font-weight: 950;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.screenTeamScore {
+    font-size: 34px;
+    font-weight: 1100;
+    font-variant-numeric: tabular-nums;
+    min-width: 72px;
+    text-align: right;
+}
+
+.lastBuzzBig {
+    margin-top: 10px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, .14);
+    background: rgba(255, 255, 255, .06);
+    font-weight: 1000;
+    font-size: 22px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+}
+
+.tipText {
+    margin-top: 6px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, .10);
+    background: rgba(255, 255, 255, .04);
+    color: var(--muted);
+}
+
+/* projector-friendly scaling on smaller screens */
+@media (max-width: 900px) {
+    .screenHeader {
+        grid-template-columns: 1fr;
+    }
+
+    .screenTime {
+        text-align: left;
+    }
+
+    .screenBody {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Spectator Screen: Animated Gradient ===== */
+body.screen {
+  min-height: 100vh;
+  margin: 0;
+  color: white;
+
+  background: linear-gradient(
+    120deg,
+    #ff3d00,
+    #ff9100,
+    #ffd400,
+    #31d3ff,
+    #7c5cff
+  );
+  background-size: 400% 400%;
+
+  animation: screenGradient 14s ease-in-out infinite;
+}
+
+/* Smooth animated movement */
+@keyframes screenGradient {
+  0%   { background-position:   0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position:   0% 50%; }
+}
+
+.screen .card,
+.screen .screenCard {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 22px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 30px 80px rgba(0,0,0,.45);
+}
+
+/* Mobile view */
+html, body {
+  width: 100%;
+  overflow-x: hidden; 
+}
+
+body.screen {
+  overflow-x: hidden;
+}
+
+/* Make container fit small screens */
+body.screen .container {
+  max-width: 100%;
+  padding: 16px 12px 28px;
+}
+
+body.screen .screenCard {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+body.screen .screenHeader {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
+}
+
+@media (max-width: 880px) {
+  body.screen .screenHeader {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+}
+
+body.screen .screenBody {
+  display: grid;
+  grid-template-columns: 1fr 0.9fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  body.screen .screenBody {
+    grid-template-columns: 1fr;
+  }
+  .roomBlock div:nth-child(2){
+    justify-content: center;
+  }
+  .screenTime{
+    text-align: center !important;
+  }
+  .screenCol div:first-child{
+    text-align: center;
+  }
+}
+
+.confettiWrap {
+  overflow: hidden;
+}
+
+body.screen::before,
+body.screen::after {
+  max-width: 100%;
+  overflow: hidden;
+}

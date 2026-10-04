@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ADABRA • Player</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/play.css" />
+  <link rel="stylesheet" href="/css/mobile.css" />
+
+</head>
+
+<body class="play">
+  <div class="container">
+    <div class="topbar">
+      <a href="/" style="text-decoration: none;">
+        <div class="brand"><span class="brand-dot"></span>ADABRA</div>
+      </a>
+      <div class="muted" style="text-align: right;">Player Console</div>
+    </div>
+
+    <div id="net" class="muted" style="display:none; width:100%; text-align:center;">
+      Reconnecting…
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <input id="roomCode" placeholder="ROOM" maxlength="6" />
+        <button id="join" class="btn btn-anim">Join</button>
+      </div>
+
+      <div class="hud">
+        <div class="hudRow">
+          <span class="pill">Room: <strong id="currentRoom" class="muted">none</strong></span>
+          <span class="pill">Team: <strong id="team" class="muted">none</strong></span>
+          <span class="pill">Phase: <strong id="phase" class="muted">—</strong></span>
+          <span class="pill">Round: <strong id="round" class="muted">0</strong></span>
+          <span class="pill">Score: <strong id="myScore" class="muted">—</strong></span>
+        </div>
+
+        <div class="timerBig">
+          <span id="time">00:00.0</span>
+          <span id="answerTime">00:00.0</span>
+        </div>
+      </div>
+
+      <div id="tablePicker">
+        <div class="row">
+          <div class="muted">Choose table:</div>
+        </div>
+
+        <div id="teams" class="teams"></div>
+      </div>
+
+
+      <div id="nameBox" style="display:none; margin-top: 10px;">
+        <div class="muted">Set your team name (one time):</div>
+        <div class="row">
+          <input id="teamNameInput" placeholder="e.g. Avengers" maxlength="16"
+            style="width: 260px; text-transform:none;" />
+          <button id="saveTeamName" class="btn btn-anim">Save</button>
+        </div>
+      </div>
+
+      <p id="msg" class="muted">Join a room, select your team, then wait for the beep.</p>
+      <div class="buzzWrap">
+        <button id="buzz" class="buzzBtn" disabled>BUZZ</button>
+      </div>
+    </div>
+    <footer class="app-footer">
+      Made with JS and <span class="heart">❤</span> by kamrandroid
+    </footer>
+  </div>
+
+  <div id="lockBanner" class="muted"
+    style="display:none; width:100%; justify-content:center; text-align:center; font-weight:700;">
+    —
+  </div>
+
+  <audio id="beepAudio" src="/sounds/beep.mp3" preload="auto"></audio>
+  <audio id="buzzAudio" src="/sounds/buzz.mp3" preload="auto"></audio>
+  <audio id="tickAudio" src="/sounds/tick.mp3" preload="auto"></audio>
+
+  <div id="winnerOverlay" class="winnerOverlay" style="display:none;">
+    <div id="winnerText" class="winnerText">TEAM WON</div>
+  </div>
+
+  <style>
+    .winnerOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, .90);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 9999;
+    }
+
+    .winnerText {
+      font-weight: 900;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      font-size: clamp(32px, 6vw, 72px);
+      padding: 18px 28px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid rgba(255, 255, 255, .14);
+      text-align: center;
+    }
+  </style>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    const netEl = document.getElementById("net");
+
+    socket.on("disconnect", () => {
+      netEl.style.display = "block";
+      netEl.textContent = "Disconnected. Reconnecting…";
+      netEl.className = "err";
+    });
+
+    const roomInput = document.getElementById("roomCode");
+    const joinBtn = document.getElementById("join");
+
+    const currentRoomEl = document.getElementById("currentRoom");
+    const teamEl = document.getElementById("team");
+    const phaseEl = document.getElementById("phase");
+    const timeEl = document.getElementById("time");
+    const answerTimeEl = document.getElementById("answerTime");
+    let playerTimerState = null;
+    let playerAnswerTimerState = null; 
+    const myScoreEl = document.getElementById("myScore");
+    const roundEl = document.getElementById("round"); 
+
+    const nameBox = document.getElementById("nameBox");
+    const teamNameInput = document.getElementById("teamNameInput");
+    const saveTeamNameBtn = document.getElementById("saveTeamName");
+
+    const msgEl = document.getElementById("msg");
+    const buzzBtn = document.getElementById("buzz");
+    buzzBtn.disabled = true;
+    const teamsEl = document.getElementById("teams");
+    const lockBannerEl = document.getElementById("lockBanner");
+
+    const beepAudio = document.getElementById("beepAudio");
+    const buzzAudio = document.getElementById("buzzAudio");
+    const tickAudio = document.getElementById("tickAudio");
+    let tickedThisRound = false;
+    let prevRemainingMs = null;
+
+    const winnerOverlayEl = document.getElementById("winnerOverlay");
+    const winnerTextEl = document.getElementById("winnerText");
+
+    let audioUnlocked = false;
+
+    function unlockAudio() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      beepAudio.volume = 1;
+      beepAudio.play().then(() => {
+        beepAudio.pause();
+        beepAudio.currentTime = 0;
+      }).catch(() => { });
+    }
+
+    let currentRoom = null;
+    let lastState = null;
+
+    window.addEventListener("beforeunload", (e) => {
+      const active = lastState && (lastState.phase === "armed" || lastState.phase === "locked");
+      const hasTeam = Boolean(myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null));
+      if (active && hasTeam) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
+
+    let myTeamId = null; // real team id: "1", "2", ...
+
+    let mySocketId = null;
+    socket.on("connect", () => {
+      mySocketId = socket.id;
+
+      netEl.style.display = "none";
+
+      if (currentRoom) {
+        socket.emit("rejoinRoom", { roomCode: currentRoom, playerId });
+      }
+    });
+
+    function teamLabel(teamId) {
+      const t = (lastState?.teams || []).find(
+        x => String(x.id) === String(teamId)
+      );
+      return t ? t.name : `Team ${teamId}`;
+    }
+
+    // message “locks”: if set, we keep it until explicitly cleared
+    let stickyMsg = null; // { text, cls } or null
+    let lastRoundNumber = null;
+    let timeUpSticky = false;
+    tickedThisRound = false;
+    prevRemainingMs = null;
+
+    function setMsg(text, cls = "muted", { sticky = false } = {}) {
+      msgEl.className = cls;
+      msgEl.textContent = text;
+      stickyMsg = sticky ? { text, cls } : null;
+    }
+
+    function hardDisableBuzzNow() {
+      buzzBtn.disabled = true;
+    }
+
+    function renderStickyMsgIfAny() {
+      if (!stickyMsg) return false;
+      msgEl.className = stickyMsg.cls;
+      msgEl.textContent = stickyMsg.text;
+      return true;
+    }
+
+    // stable playerId (survives refresh)
+    function getOrCreatePlayerId() {
+      const key = "adabra_playerId_v1";
+      let id = localStorage.getItem(key);
+      if (!id) {
+        id = (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2));
+        localStorage.setItem(key, id);
+      }
+      return id;
+    }
+    const playerId = getOrCreatePlayerId();
+
+    let focusLossTimer = null;
+
+    function reportFocus(focused) {
+      const chosenTeam = myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null);
+      if (!currentRoom || !chosenTeam) return;
+
+      if (focused) {
+        if (focusLossTimer) {
+          clearTimeout(focusLossTimer);
+          focusLossTimer = null;
+        }
+        return;
+      }
+
+      if (!focusLossTimer) {
+        focusLossTimer = setTimeout(() => {
+          focusLossTimer = null;
+          socket.emit("playerFocus", { focused: false });
+        }, 800);
+      }
+    }
+
+    window.addEventListener("blur", () => reportFocus(false));
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") reportFocus(false);
+    });
+    window.addEventListener("focus", () => reportFocus(true));
+
+    function roomTeamKey(roomCode) {
+      return `adabra_team_v1_${roomCode}`;
+    }
+
+    function updateTimerWarning(ms, phase) {
+      const timerBox = document.querySelector(".timerBig");
+      const danger = phase === "armed" && ms <= 3000 && ms > 0;
+      timerBox?.classList.toggle("timerDanger", danger);
+      timerBox?.classList.toggle("timerPulse", danger);
+    }
+
+    function formatMs(ms) {
+     const m = Math.floor(ms / 60000);
+     const s = Math.floor((ms % 60000) / 1000);
+     const t = Math.floor((ms % 1000) / 10);
+     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(t).padStart(2, "0")}`;
+    }
+
+    function getQueryRoom() {
+      const params = new URLSearchParams(location.search);
+      const r = params.get("room");
+      return r ? r.trim().toUpperCase() : "";
+    }
+
+    function getSavedTeam(roomCode) {
+      return localStorage.getItem(roomTeamKey(roomCode)) || null;
+    }
+
+    function saveTeam(roomCode, teamId) {
+      localStorage.setItem(roomTeamKey(roomCode), teamId);
+    }
+
+    function clearSavedTeam(roomCode) {
+      localStorage.removeItem(roomTeamKey(roomCode));
+    }
+
+    function renderTeamButtons(teams, chosenTeamId, takenTeams, myPlayerId) {
+      const taken = new Map((takenTeams || []).map(x => [String(x.teamId), x.playerId]));
+      teamsEl.innerHTML = "";
+
+      for (const t of teams) {
+        const teamId = String(t.id);
+        const btn = document.createElement("button");
+        btn.className = "teamBtn";
+
+        const takenBy = taken.get(teamId);
+        const isTakenByOther = Boolean(takenBy && takenBy !== myPlayerId);
+
+        btn.textContent = isTakenByOther ? `Table ${teamId} (Taken)` : `Table ${teamId}`;
+        btn.disabled = Boolean(chosenTeamId) || isTakenByOther;
+        btn.classList.toggle("isTaken", isTakenByOther);
+
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          socket.emit("setTeam", { teamId });
+        };
+
+        teamsEl.appendChild(btn);
+      }
+    }
+
+
+    function updateMyScore() {
+      const chosenTeam = myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null);
+      if (!chosenTeam || !lastState || !Array.isArray(lastState.teams)) {
+        myScoreEl.textContent = "—";
+        myScoreEl.className = "bigScore muted";
+        return;
+      }
+
+      const t = lastState.teams.find(x => String(x.id) === String(chosenTeam));
+      if (!t) {
+        myScoreEl.textContent = "—";
+        myScoreEl.className = "bigScore muted";
+        return;
+      }
+
+      myScoreEl.textContent = String(t.score);
+      myScoreEl.className = "bigScore ok";
+    }
+
+    // ---- NEW: locked-out handling + buzz button enable/disable ----
+    function updateBuzzAvailability() {
+      const chosenTeam = myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null);
+      if (!chosenTeam || !lastState) {
+        buzzBtn.disabled = true;
+        return;
+      }
+
+      const lockedOut = new Set(lastState.lockedOutTeams || []);
+      const isLockedOut = lockedOut.has(chosenTeam);
+
+      const focusLocked = new Set(lastState.focusLockedTeams || []);
+      const isFocusLocked = focusLocked.has(String(chosenTeam));
+
+
+      // disable buzz if locked out OR round not armed
+      if (isLockedOut) {
+        buzzBtn.disabled = true;
+        setMsg("Your team is locked out for this round.", "err", { sticky: true });
+        return;
+      }
+
+      const falseStart = new Set(lastState.falseStartTeams || []);
+      const isFalseStart = falseStart.has(String(chosenTeam));
+      if (isFalseStart) {
+        buzzBtn.disabled = true;
+        setMsg("FALSE START — Locked out this round.", "err", { sticky: true });
+        return;
+      }
+
+
+      // not locked out
+      buzzBtn.disabled = (lastState.phase !== "armed");
+
+      if (isFocusLocked) {
+        buzzBtn.disabled = true;
+        setMsg("FOCUS LOST — You are locked for this round.", "err", { sticky: true });
+        return;
+      }
+
+    }
+
+    function joinRoom(code) {
+      const roomCode = String(code || "").trim().toUpperCase();
+      if (!roomCode) return setMsg("Enter a room code.", "err");
+
+      currentRoom = roomCode;
+      currentRoomEl.textContent = roomCode;
+      currentRoomEl.className = "ok";
+
+      const saved = getSavedTeam(roomCode);
+      myTeamId = saved ? String(saved) : null;
+
+      document.getElementById("tablePicker").style.display = myTeamId ? "none" : "block";
+
+      if (myTeamId) {
+        teamEl.textContent = `${teamLabel(myTeamId)}`;
+        teamEl.className = "ok";
+      } else {
+        teamEl.textContent = "none";
+        teamEl.className = "muted";
+      }
+
+      socket.emit("joinRoom", { roomCode, playerId });
+    }
+
+    // auto join from link
+    const queryRoom = getQueryRoom();
+    if (queryRoom) {
+      roomInput.value = queryRoom;
+      joinRoom(queryRoom);
+    }
+
+    joinBtn.onclick = () => {
+      unlockAudio();
+      joinRoom(roomInput.value);
+    };
+
+    function isTypingIntoField() {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = (el.tagName || "").toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select" || el.isContentEditable;
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code !== "Space") return;
+      if (e.repeat) return;
+      if (isTypingIntoField()) return;
+
+      const chosenTeam = myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null);
+      if (!chosenTeam) return;
+      if (!lastState) return;
+      if (lastState.phase !== "armed") {
+        e.preventDefault();
+        unlockAudio();
+        playBuzzSound();
+        socket.emit("falseStartAttempt");
+        return;
+      }
+
+      if (buzzBtn.disabled) return;
+
+      e.preventDefault();
+      buzzBtn.click();
+    });
+
+    // play local buzz sound when user clicks buzz
+    function playBuzzSound() {
+      buzzAudio.currentTime = 0;
+      buzzAudio.play().catch(() => { });
+    }
+
+    buzzBtn.onclick = () => {
+      unlockAudio();
+      if (buzzBtn.disabled) return;
+      playBuzzSound();
+      hardDisableBuzzNow();
+      buzzBtn.classList.add("buzzFlash");
+      setTimeout(() => buzzBtn.classList.remove("buzzFlash"), 220);
+      socket.emit("buzz");
+    };
+
+    saveTeamNameBtn.onclick = () => {
+      const name = teamNameInput.value;
+      socket.emit("setTeamName", { name });
+    };
+
+    socket.on("beep", () => {
+      // new round start clears sticky “locked out” etc.
+      stickyMsg = null;
+
+      beepAudio.currentTime = 0;
+      beepAudio.currentTime = 0;
+      beepAudio.play().catch(err => {
+        console.warn("Beep failed:", err);
+      });
+    });
+
+    socket.on("timeUp", () => {
+      setMsg("TIME IS UP!", "err");
+      hardDisableBuzzNow();
+    });
+
+    socket.on("joinedRoom", ({ roomCode }) => {
+      setMsg(`Joined room ${roomCode}. Select your team once, then wait for the beep.`, "ok");
+    });
+
+    socket.on("teamSet", ({ teamId }) => {
+      myTeamId = String(teamId);
+      if (currentRoom) saveTeam(currentRoom, myTeamId);
+
+      teamEl.textContent = teamLabel(myTeamId);
+      teamEl.className = "ok";
+
+      document.getElementById("tablePicker").style.display = "none";
+
+      setMsg("Team selected.", "ok");
+
+      updateMyScore();
+      updateBuzzAvailability();
+    });
+
+    socket.on("teamRemoved", ({ teamId, playerId }) => {
+      if (!currentRoom) return;
+
+      if (playerId !== playerIdStored) return;
+
+      myTeamId = null;
+      clearSavedTeam(currentRoom);
+
+      document.getElementById("tablePicker").style.display = "block";
+      teamsEl.style.display = "flex";
+      buzzBtn.disabled = true;
+
+      setMsg("🚫 Your team was removed by the host.", "err", { sticky: true });
+    });
+
+    socket.on("kicked", ({ reason }) => {
+      myTeamId = null;
+      localStorage.removeItem(roomTeamKey(currentRoom));
+
+      buzzBtn.disabled = true;
+      teamsEl.style.display = "flex";
+      nameBox.style.display = "none";
+
+      setMsg("You were removed by host.", "err", { sticky: true });
+    });
+     
+    function animatePlayerTimers() {
+  const now = performance.now();
+
+  if (playerTimerState) {
+    const elapsed = playerTimerState.running
+      ? now - playerTimerState.updatedAt
+      : 0;
+
+    const remaining = Math.max(0, playerTimerState.value - elapsed);
+    timeEl.textContent = formatMs(remaining);
+  }
+
+  if (playerAnswerTimerState) {
+    const elapsed = playerAnswerTimerState.running
+      ? now - playerAnswerTimerState.updatedAt
+      : 0;
+
+    const remaining = Math.max(0, playerAnswerTimerState.value - elapsed);
+    answerTimeEl.textContent = formatMs(remaining);
+  }
+
+  requestAnimationFrame(animatePlayerTimers);
+}
+
+animatePlayerTimers();
+    socket.on("roomState", (state) => {
+      if (lastState?.kicked === true) return;
+      if (!currentRoom || state.roomCode !== currentRoom) return;
+
+      if (state.gameOver) {
+        if (winnerTextEl) winnerTextEl.textContent = state.winnerText || "GAME OVER";
+        if (winnerOverlayEl) winnerOverlayEl.style.display = "flex";
+      } else {
+        if (winnerOverlayEl) winnerOverlayEl.style.display = "none";
+      }
+
+      lastState = state;
+
+      timeUpSticky = Boolean(state.timeUpAt);
+
+      // New round, clear sticky messages (lockout, etc.)
+      if (lastRoundNumber === null) lastRoundNumber = state.roundNumber;
+      if (state.roundNumber !== lastRoundNumber) {
+        stickyMsg = null;
+        lastRoundNumber = state.roundNumber;
+      }
+
+      if (state.phase === "locked" && state.lastBuzz) {
+        lockBannerEl.style.display = "block";
+
+        const chosenTeam = myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null);
+
+        // invalidate saved team if it no longer exists or was removed
+        if (chosenTeam) {
+          const exists = (state.teams || []).some(t => String(t.id) === String(chosenTeam));
+          const removed = (state.removedTeams || []).includes(String(chosenTeam));
+          if (!exists || removed) {
+            clearSavedTeam(currentRoom);
+            myTeamId = null;
+          }
+        }
+
+        const myTeam = myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null);
+        const isMe = myTeam && String(state.lastBuzz.teamId) === String(myTeam);
+
+        lockBannerEl.className = "pill";
+        if (isMe) {
+          lockBannerEl.textContent = "LOCKED — Your team is answering";
+          lockBannerEl.classList.add("ok", "waitPulse");
+        } else {
+          lockBannerEl.textContent = `LOCKED — ${teamLabel(state.lastBuzz.teamId)} is answering`;
+          lockBannerEl.classList.add("muted");
+          lockBannerEl.classList.remove("waitPulse");
+        }
+      } else {
+        lockBannerEl.style.display = "none";
+        lockBannerEl.classList.remove("waitPulse");
+      }
+
+      phaseEl.textContent = state.phase;
+      phaseEl.className = state.phase === "armed" ? "ok" : "muted";
+
+      playerTimerState = {
+  value: Number(state.remainingMs || 0),
+  updatedAt: performance.now(),
+  running: Boolean(state.timerRunning)
+};
+
+playerAnswerTimerState = {
+  value: Number(state.answerRemainingMs || 0),
+  updatedAt: performance.now(),
+  running: state.phase === "locked"
+};
+
+timeEl.textContent = formatMs(state.remainingMs);
+answerTimeEl.textContent = formatMs(state.answerRemainingMs);
+
+      updateTimerWarning(state.remainingMs, state.phase);
+
+      if (state.phase === "armed") {
+        const ms = Number(state.remainingMs || 0);
+
+        if (prevRemainingMs === null) prevRemainingMs = ms;
+
+        const crossedIntoLast3 =
+          !tickedThisRound &&
+          prevRemainingMs > 3000 &&
+          ms <= 3000 &&
+          ms > 0;
+
+        if (crossedIntoLast3) {
+          tickedThisRound = true;
+          tickAudio.currentTime = 0;
+          tickAudio.play().catch(() => { });
+        }
+
+        prevRemainingMs = ms;
+      } else {
+        prevRemainingMs = null;
+      }
+
+      const chosenTeam = myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null);
+
+      if (chosenTeam) {
+        const isNowFocusLocked = new Set(state.focusLockedTeams || []).has(String(chosenTeam));
+
+        const fairPlayOn = Boolean(state.fairPlayEnabled);
+
+        if ((!fairPlayOn || !isNowFocusLocked) && stickyMsg && typeof stickyMsg.text === "string") {
+          if (stickyMsg.text.startsWith("FOCUS LOST")) {
+            stickyMsg = null;
+          }
+        }
+      }
+
+      const finalChosenTeam = myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null);
+      teamsEl.style.display = finalChosenTeam ? "none" : "flex";
+      document.getElementById("tablePicker").style.display = finalChosenTeam ? "none" : "block";
+
+      if (chosenTeam) {
+        teamEl.textContent = `${teamLabel(chosenTeam)}`;
+        teamEl.className = "ok";
+      } else {
+        teamEl.textContent = "none";
+        teamEl.className = "muted";
+      }
+
+      roundEl.textContent = String(state.roundNumber ?? 0);
+      roundEl.className = "ok";
+
+      renderTeamButtons(state.teams, chosenTeam, state.takenTeams, playerId);
+
+      // TEAM NAME BOX SHOW/HIDE
+      const lockedNames = new Set(state.teamNameLocked || []);
+      const takenMap = new Map((state.takenTeams || []).map(x => [x.teamId, x.playerId]));
+      const iOwnThisTeam = chosenTeam && takenMap.get(chosenTeam) === playerId;
+
+      if (chosenTeam && iOwnThisTeam && !lockedNames.has(chosenTeam)) {
+        nameBox.style.display = "block";
+      } else {
+        nameBox.style.display = "none";
+      }
+
+      updateMyScore();
+      updateBuzzAvailability();
+
+      if (!chosenTeam) {
+        buzzBtn.disabled = true;
+        setMsg("Select your table.", "muted");
+        return;
+      }
+
+      if (timeUpSticky) {
+        hardDisableBuzzNow();
+        setMsg("TIME IS UP!", "err");
+        return;
+      }
+
+      const falseStart = new Set(state.falseStartTeams || []);
+      if (chosenTeam && falseStart.has(String(chosenTeam))) {
+        buzzBtn.disabled = true;
+        setMsg("FALSE START — Locked out this round.", "err", { sticky: true });
+      }
+
+
+      // If a sticky message exists (locked out, etc.), keep it
+      if (renderStickyMsgIfAny()) return;
+
+      // ===== LOCKED: show correct buzz message and STOP =====
+      if (state.phase === "locked" && state.lastBuzz) {
+        const myTeam = myTeamId || (currentRoom ? getSavedTeam(currentRoom) : null);
+
+        const isMe = myTeam && String(state.lastBuzz.teamId) === String(myTeam);
+        const isFirst =
+          state.firstBuzzTeamId &&
+          String(state.firstBuzzTeamId) === String(state.lastBuzz.teamId);
+
+        if (isFirst) {
+          if (isMe) {
+            setMsg("You buzzed first.", "ok");
+          } else {
+            setMsg(`${teamLabel(state.lastBuzz.teamId)} buzzed first. Wait…`, "muted");
+          }
+        } else {
+          if (isMe) {
+            setMsg("You buzzed. Now it’s your chance. Waiting for host…", "ok");
+          } else {
+            setMsg(`${teamLabel(state.lastBuzz.teamId)} buzzed. Wait…`, "muted");
+          }
+        }
+
+        return; // prevents "Round started. Buzz now!"
+      }
+
+      if (state.phase === "lobby") setMsg("Waiting for beep…", "muted");
+      if (state.phase === "armed") setMsg("Round started. Buzz now!", "ok");
+    });
+
+    socket.on("buzzed", ({ roomCode }) => {
+      if (roomCode !== currentRoom) return;
+      hardDisableBuzzNow(); // stop spam instantly
+    });
+
+    socket.on("buzzRejected", ({ reason }) => {
+      if (reason === "NO_TEAM") setMsg("Choose your team first.", "err");
+      else if (reason === "TIME_UP") setMsg("Too late. Time is up.", "err");
+      else if (reason === "TEAM_LOCKED_OUT") setMsg("Your team is locked out this round.", "err", { sticky: true });
+      else if (reason === "FOCUS_LOCKED") setMsg("FOCUS LOST — Host locked your team for this round.", "err", { sticky: true });
+      else if (reason === "KICKED") setMsg("🚫 You were removed by host.", "err", { sticky: true });
+    });
+
+    socket.on("errorMsg", (text) => setMsg(text, "err"));
+  </script>
+
+</body>
+
+</html>

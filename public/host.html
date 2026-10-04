@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ADABRA • Host</title>
+    <link rel="stylesheet" href="/css/app.css" />
+    <link rel="stylesheet" href="/css/mobile.css" />
+
+</head>
+
+<body>
+    <div class="container">
+        <div class="topbar">
+            <a href="/" style="text-decoration: none;">
+                <div class="brand"><span class="brand-dot"></span>ADABRA</div>
+            </a>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div class="muted">Host Screen</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="hostSplit">
+                <div class="hostLeft">
+
+                    <div class="row">
+                        <button id="create" class="btn">Create New Room</button>
+                        <button id="endRound" class="btn btn-danger">End Round</button>
+
+                        <label class="pill" style="gap:10px;">
+                            FairPlay
+                            <input id="fairPlayToggle" type="checkbox" style="transform:scale(1.2);" />
+                        </label>
+
+                        <span id="status" class="muted">Ready.</span>
+                    </div>
+
+                    <div class="row" style="justify-content: space-between;">
+                        <div id="roomCodeWrap" style="display:none;">
+                            <div class="muted">Room code</div>
+                            <div id="roomCode" class="code muted">—</div>
+                        </div>
+
+                        <div class="pill">Round: <strong id="round" class="muted">0</strong></div>
+                        <div class="pill">Phase: <strong id="phase" class="muted">—</strong></div>
+                        <div class="pill">Members: <strong id="members" class="muted">0</strong></div>
+                        <div class="pill">Running: <strong id="running" class="muted">no</strong></div>
+                    </div>
+                    <div class="row" style="gap:14px;">
+                        <div class="pill pillBig" style="flex:1; justify-content:center;">
+    <strong id="time" class="hostTimer">00:15.0</strong>
+</div>
+
+<div class="pill pillBig" style="flex:1; justify-content:center;">
+    <strong id="answerTime" class="hostTimer">00:10.0</strong>
+</div>
+
+<div class="pill pillBig" style="flex:1; justify-content:center;">
+    <strong id="lastBuzz" class="muted">—</strong>
+</div>
+                    </div>
+
+                    <div class="row">
+                        <div style="flex: 1;">
+                            <div class="muted" style="margin-bottom: 14px;">Game link</div>
+                            <input id="playerLink" readonly style="width: 100%;" />
+                        </div>
+
+                        <button id="openScreen" class="btn" style="width: 100%;">PRESENT</button>
+                    </div>
+
+                    <hr />
+
+                    <div class="controlsCenter">
+                        <div class="controlsTop">
+                            <button id="nextRound" class="btn btn-ghost">↻ NEXT ROUND</button>
+                            <button id="beepStart" class="btn btn-start">🚀 START</button>
+                            <button id="pauseTimer" class="btn btn-warn">⏹ STOP</button>
+                        </div>
+                        <hr />
+                        <div class="muted" style="text-align:center; margin-bottom:6px;">
+                            Judge the answer
+                        </div>
+                        <div class="controlsBottom">
+                            <button id="incorrect" class="btn btn-danger btn-round">✕</button>
+                            <button id="correct" class="btn btn-success btn-round">✓</button>
+                        </div>
+                    </div>
+                    <hr />
+                    <div class="kvGrid">
+                        <div class="kvLabel">Teams</div>
+                        <div class="kvField">
+                            <select id="teamCount" class="field">
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                                <option value="6">6</option>
+                            </select>
+                            <button id="applyTeams" class="btn">Increase teams</button>
+                        </div>
+
+                        <div class="kvLabel">Duration (sec)</div>
+                        <div class="kvField">
+                            <input id="duration" class="field" type="number" min="1" max="600" step="1" value="15" />
+                            <button id="setDuration" class="btn">Set</button>
+                        </div>
+                        <div class="kvLabel">Answer Duration (sec)</div>
+<div class="kvField">
+    <input id="answerDuration" class="field" type="number" min="1" max="60" step="1" value="10" />
+    <button id="setAnswerDuration" class="btn">Set</button>
+</div>
+                    </div>
+
+                </div> <!-- /hostLeft -->
+
+                <div class="hostRight">
+                    <h2 style="margin: 0 0 8px 0;">Scoreboard</h2>
+                    <div id="scoreboard" class="grid"></div>
+                </div>
+            </div> <!-- /hostSplit -->
+        </div>
+        <footer class="app-footer">
+            Made with JS and <span class="heart">❤</span> by kamrandroid
+        </footer>
+    </div>
+
+    <audio id="beepAudio" src="/sounds/beep.mp3" preload="auto"></audio>
+    <audio id="buzzAudio" src="/sounds/buzz.mp3" preload="auto"></audio>
+    <audio id="tickAudio" src="/sounds/tick.mp3" preload="auto"></audio>
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        const socket = io();
+
+        const createBtn = document.getElementById("create");
+        const statusEl = document.getElementById("status");
+        const roomCodeEl = document.getElementById("roomCode");
+        const playerLinkEl = document.getElementById("playerLink");
+
+        const roundEl = document.getElementById("round");
+        const phaseEl = document.getElementById("phase");
+        const membersEl = document.getElementById("members");
+        const timeEl = document.getElementById("time");
+        const answerTimeEl = document.getElementById("answerTime");
+        const runningEl = document.getElementById("running");
+
+        const nextRoundBtn = document.getElementById("nextRound");
+        const beepStartBtn = document.getElementById("beepStart");
+        const pauseTimerBtn = document.getElementById("pauseTimer");
+        const incorrectBtn = document.getElementById("incorrect");
+        const correctBtn = document.getElementById("correct");
+
+        const teamCountSel = document.getElementById("teamCount");
+        const applyTeamsBtn = document.getElementById("applyTeams");
+
+        const durationInput = document.getElementById("duration");
+        const setDurationBtn = document.getElementById("setDuration");
+        const answerDurationInput = document.getElementById("answerDuration");
+const setAnswerDurationBtn = document.getElementById("setAnswerDuration");
+
+        const lastBuzzEl = document.getElementById("lastBuzz");
+        const scoreboardEl = document.getElementById("scoreboard");
+
+        const beepAudio = document.getElementById("beepAudio");
+        const buzzAudio = document.getElementById("buzzAudio");
+
+        const endRoundBtn = document.getElementById("endRound");
+        const fairPlayToggle = document.getElementById("fairPlayToggle");
+
+        const tickAudio = document.getElementById("tickAudio");
+        let tickedThisRound = false;
+
+        const openScreenBtn = document.getElementById("openScreen");
+
+        let currentRoom = null;
+        openScreenBtn.disabled = true;
+        endRoundBtn.disabled = true;
+        fairPlayToggle.disabled = true;
+
+        let hostKey = null;
+
+        let lastHostState = null;
+        let lastScoreboardKey = null;
+
+        function isTypingIntoField() {
+            const el = document.activeElement;
+            if (!el) return false;
+            const tag = (el.tagName || "").toLowerCase();
+            return tag === "input" || tag === "textarea" || tag === "select" || el.isContentEditable;
+        }
+
+        window.addEventListener("keydown", (e) => {
+            if (e.code !== "Space") return;
+            if (e.repeat) return;
+            if (isTypingIntoField()) return;
+            if (!currentRoom) return;
+
+            if (lastHostState?.gameOver) return;
+
+            e.preventDefault();
+
+            const running = Boolean(lastHostState?.timerRunning);
+
+            // Toggle behavior:
+            if (running) {
+                pauseTimerBtn.click();
+            } else {
+                beepStartBtn.click();
+            }
+        });
+
+        const TEAM_COLORS = ["#7c5cff", "#31d3ff", "#19d17f", "#ffd400", "#ff5a00", "#ff3d88"];
+        function teamColor(teamId) {
+            const n = Number(teamId);
+            const i = Number.isFinite(n) ? ((n - 1) % TEAM_COLORS.length) : 0;
+            return TEAM_COLORS[i];
+        }
+
+        const prevScores = new Map(); // teamId -> last score
+
+        function setStatus(text, cls = "muted") {
+            statusEl.className = cls;
+            statusEl.textContent = text;
+        }
+
+        function showRoomCodeStatus() {
+            if (lastHostState?.gameOver) {
+                const text = lastHostState?.winnerText
+                    ? `ROUND ENDED. ${lastHostState.winnerText}`
+                    : "ROUND ENDED";
+                setStatus(text, "err");
+                return;
+            }
+
+            if (currentRoom) {
+                setStatus(`Room: ${currentRoom}`, "ok");
+            } else {
+                setStatus("Ready.", "muted");
+            }
+        }
+
+        playerLinkEl.onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(playerLinkEl.value);
+                setStatus("Link copied to clipboard.", "ok");
+                setTimeout(showRoomCodeStatus, 900);
+            } catch {
+                setStatus("Copy failed. Copy manually.", "err");
+            }
+        };
+
+        function updateTimerWarning(ms, phase) {
+            const danger = phase === "armed" && ms <= 3000 && ms > 0;
+            timeEl.classList.toggle("timerDanger", danger);
+            timeEl.classList.toggle("timerPulse", danger);
+        }
+
+        function formatMs(ms) {
+            const m = Math.floor(ms / 60000);
+            const s = Math.floor((ms % 60000) / 1000);
+            const t = Math.floor((ms % 1000) / 10);
+            return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(t).padStart(2, "0")}`;
+        }
+        let hostTimerState = null;
+        let hostAnswerTimerState = null; 
+
+        function animateHostTimers() {
+           const now = performance.now();
+
+           if (hostTimerState) {
+            const elapsed = hostTimerState.running
+            ? now - hostTimerState.updatedAt
+            : 0;
+
+            const remaining = Math.max(0, hostTimerState.value - elapsed);
+            timeEl.textContent = formatMs(remaining);
+        }
+
+            if (hostAnswerTimerState) {
+             const elapsed = hostAnswerTimerState.running
+                ? now - hostAnswerTimerState.updatedAt
+                : 0;
+
+             const remaining = Math.max(0, hostAnswerTimerState.value - elapsed);
+             answerTimeEl.textContent = formatMs(remaining);
+            }
+
+            requestAnimationFrame(animateHostTimers);
+        }
+ 
+        animateHostTimers();
+
+        function teamNameFromState(state, teamId) {
+            const t = (state.teams || []).find(x => String(x.id) === String(teamId));
+            return t ? t.name : `Team ${teamId}`;
+        }
+
+        function renderScoreboard(teams, lockedOutTeams, takenTeams, focusLockedTeams, falseStartTeams, removedTeams) {
+            const removed = new Set(removedTeams || []);
+            const locked = new Set(lockedOutTeams || []);
+            const falseStart = new Set(falseStartTeams || []);
+            const focusLocked = new Set(focusLockedTeams || []);
+            const takenMap = new Map((takenTeams || []).map(x => [String(x.teamId), x.playerId]));
+
+            scoreboardEl.innerHTML = "";
+
+            for (const t of teams) {
+                const card = document.createElement("div");
+                card.className = "teamCard";
+
+                const isTaken = takenMap.has(String(t.id));
+
+                card.innerHTML = `
+                    <div class="teamHead">
+                        <div class="teamMeta">
+                        <div class="teamTitle">
+                            <span class="teamAvatar" style="background:${teamColor(t.id)}"></span>
+                            <span style="margin-left:10px;">${t.name}</span>
+                        </div>
+
+                        <div class="muted">
+                            Table chosen:
+                            <strong class="${isTaken ? "ok" : "muted"}">${isTaken ? "Yes" : "No"}</strong>
+                        </div>
+
+                        <div class="lockout ${locked.has(t.id) ? "err" : "muted"}">
+                            ${locked.has(t.id) ? "LOCKED OUT this round" : ""}
+                        </div>
+
+                        <div class="lockout ${falseStart.has(String(t.id)) ? "err" : "muted"}" style="margin-top:6px;">
+                            ${falseStart.has(String(t.id)) ? "FALSE START (locked this round)" : ""}
+                        </div>
+
+                        <div class="lockout ${focusLocked.has(String(t.id)) ? "err" : "muted"}" style="margin-top:6px;">
+                            ${focusLocked.has(String(t.id)) ? "FOCUS LOST" : ""}
+                        </div>
+
+                        ${focusLocked.has(String(t.id)) ? `
+                        <div style="margin-top:10px;">
+                            <button class="btn btn-warn" data-unfocus="${t.id}">UNBLOCK FOCUS</button>
+                        </div>
+                        ` : ``}
+                        </div>
+
+                        <div class="teamRight">
+                        <div class="score" data-score-team="${t.id}">${t.score}</div>
+                        <div class="scoreBtns">
+                            <button class="btn" data-team="${t.id}" data-delta="1">+1</button>
+                            <button class="btn" data-team="${t.id}" data-delta="2">+2</button>
+                            <button class="btn" data-team="${t.id}" data-delta="3">+3</button>
+                            <button class="btn" data-team="${t.id}" data-delta="-1">-1</button>
+                        </div>
+                        <div style="width: 40px;">
+                            <button class="btn btn-danger" data-remove="${t.id}">x</button>
+                        </div>
+                        </div>
+                    </div>
+                    `;
+
+                // Score buttons
+                card.querySelectorAll(".scoreBtns button").forEach(btn => {
+                    btn.onclick = () => {
+                        socket.emit("hostAdjustScore", {
+                            teamId: btn.dataset.team,
+                            delta: Number(btn.dataset.delta)
+                        });
+                    };
+                });
+
+                const unfocusBtn = card.querySelector('[data-unfocus]');
+                if (unfocusBtn) {
+                    unfocusBtn.onclick = () => {
+                        socket.emit("hostUnblockFocus", { teamId: unfocusBtn.dataset.unfocus });
+                    };
+                }
+
+                scoreboardEl.appendChild(card);
+
+                const removeBtn = card.querySelector('[data-remove]');
+                if (removeBtn) {
+                    removeBtn.onclick = () => {
+                        socket.emit("hostRemoveTeam", { teamId: removeBtn.dataset.remove });
+                    };
+                }
+
+                const scoreEl = card.querySelector(`[data-score-team="${t.id}"]`);
+                const prev = prevScores.get(String(t.id));
+                if (typeof prev === "number" && t.score > prev) {
+                    scoreEl.classList.remove("scorePop");
+                    void scoreEl.offsetWidth;
+                    scoreEl.classList.add("scorePop");
+                }
+                prevScores.set(String(t.id), t.score);
+
+            }
+        }
+
+        createBtn.onclick = async () => {
+            setStatus("Creating room...", "muted");
+            try {
+                const res = await fetch("/api/rooms/create");
+                const data = await res.json();
+
+                currentRoom = data.roomCode;
+                setHostControlsLocked(false);
+
+                openScreenBtn.disabled = false;
+                endRoundBtn.disabled = false;
+                fairPlayToggle.disabled = false;
+
+                hostKey = data.hostKey;
+
+                roomCodeEl.textContent = currentRoom;
+                roomCodeEl.className = "code ok";
+
+                playerLinkEl.value = `${location.origin}/play?room=${encodeURIComponent(currentRoom)}`;
+                playerLinkEl.style.cursor = "copy";
+                playerLinkEl.title = "Click to copy";
+
+                playerLinkEl.onclick = async () => {
+                    try {
+                        await navigator.clipboard.writeText(playerLinkEl.value);
+                        setStatus("Link copied to clipboard.", "ok");
+                        setTimeout(showRoomCodeStatus, 900);
+                    } catch {
+                        setStatus("Copy failed. Copy manually.", "err");
+                    }
+                };
+
+                socket.emit("joinRoom", { roomCode: currentRoom, hostKey });
+
+                showRoomCodeStatus();
+
+            } catch (e) {
+                console.error(e);
+                setStatus("Failed to create a room.", "err");
+            }
+        };
+
+        openScreenBtn.onclick = () => {
+            if (!currentRoom) return;
+            window.open(
+                `/screen?room=${encodeURIComponent(currentRoom)}`,
+                "_blank",
+                "noopener"
+            );
+        };
+
+        function hostGuard() {
+            if (!currentRoom) return false;
+            if (lastHostState?.gameOver) return false;
+            return true;
+        }
+
+        nextRoundBtn.onclick = () => { if (hostGuard()) socket.emit("hostNextRound"); };
+        beepStartBtn.onclick = () => { if (hostGuard()) socket.emit("hostBeepStart"); };
+        pauseTimerBtn.onclick = () => { if (hostGuard()) socket.emit("hostPauseTimer"); };
+        incorrectBtn.onclick = () => { if (hostGuard()) socket.emit("hostIncorrect"); };
+        correctBtn.onclick = () => { if (hostGuard()) socket.emit("hostCorrect"); };
+
+        applyTeamsBtn.onclick = () => { if (hostGuard()) socket.emit("hostSetTeamCount", { count: Number(teamCountSel.value) }); };
+        setDurationBtn.onclick = () => { if (hostGuard()) socket.emit("hostSetDuration", { seconds: Number(durationInput.value) }); };
+        setAnswerDurationBtn.onclick = () => {
+    if (hostGuard()) {
+        socket.emit("hostSetAnswerDuration", {
+            seconds: Number(answerDurationInput.value)
+        });
+    }};
+
+        endRoundBtn.onclick = () => { if (hostGuard()) socket.emit("hostEndRound"); };
+
+        fairPlayToggle.onchange = () => {
+            socket.emit("hostSetFairPlay", { enabled: fairPlayToggle.checked });
+        };
+
+        socket.on("beep", () => {
+            beepAudio.currentTime = 0;
+            beepAudio.play().catch(() => { });
+        });
+
+        let lastBuzzKey = null;
+        
+
+        socket.on("buzzed", ({ roomCode, teamId, by }) => {
+            if (!currentRoom || roomCode !== currentRoom) return;
+
+            // Prevent double-play if the same buzz arrives twice
+            const key = `${roomCode}:${by}:${teamId}`;
+            if (lastBuzzKey === key) return;
+            lastBuzzKey = key;
+
+            buzzAudio.currentTime = 0;
+            buzzAudio.play().catch(() => { });
+        });
+
+        socket.on("falseStartFx", ({ teamId }) => {
+            buzzAudio.currentTime = 0;
+            buzzAudio.play().catch(() => { });
+            setStatus(`FALSE START — Team ${teamId}`, "err");
+        });
+
+
+        let statusTimeoutId = null;
+        let timeUpSticky = false;
+
+        function setStatusTemp(text, cls, ms = 1200) {
+            if (statusTimeoutId) clearTimeout(statusTimeoutId);
+            setStatus(text, cls);
+            statusTimeoutId = setTimeout(showRoomCodeStatus, ms);
+        }
+
+        socket.on("timeUp", () => {
+            timeUpSticky = true;
+            setStatus("TIME IS UP!", "err");
+        });
+
+        socket.on("errorMsg", (text) => setStatus(text, "err"));
+
+        function setHostControlsLocked(locked) {
+            nextRoundBtn.disabled = locked;
+            beepStartBtn.disabled = locked;
+            pauseTimerBtn.disabled = locked;
+            correctBtn.disabled = locked;
+            incorrectBtn.disabled = locked;
+
+            applyTeamsBtn.disabled = locked;
+            setDurationBtn.disabled = locked;
+
+            endRoundBtn.disabled = locked || !currentRoom;
+
+            document.body.classList.toggle("hostLocked", locked);
+        }
+
+        socket.on("roomState", (state) => {
+            if (!currentRoom || state.roomCode !== currentRoom) return;
+            lastHostState = state;
+            timeUpSticky = Boolean(state.timeUpAt);
+            if (timeUpSticky) {
+                if (statusTimeoutId) clearTimeout(statusTimeoutId);
+                setStatus("TIME IS UP!", "err");
+            }
+
+            const isGameOver = Boolean(state.gameOver);
+            setHostControlsLocked(isGameOver);
+
+            if (typeof state.fairPlayEnabled !== "undefined" && fairPlayToggle) {
+                const v = Boolean(state.fairPlayEnabled);
+                if (fairPlayToggle.checked !== v) fairPlayToggle.checked = v;
+            }
+
+            if (isGameOver) {
+                if (statusTimeoutId) clearTimeout(statusTimeoutId);
+                showRoomCodeStatus();
+            }
+
+            // const roomWrap = document.getElementById("roomCodeWrap");
+            // if (roomWrap) roomWrap.style.display = "block";
+
+            if (isGameOver) {
+                roomCodeEl.textContent = "ROUND ENDED";
+                roomCodeEl.className = "code err";
+            } else {
+                roomCodeEl.textContent = currentRoom || "—";
+                roomCodeEl.className = currentRoom ? "code ok" : "code muted";
+            }
+
+
+            roundEl.textContent = String(state.roundNumber ?? 0);
+
+            if (typeof window._lastRoundSeen === "undefined") window._lastRoundSeen = state.roundNumber ?? 0;
+            const nowRound = state.roundNumber ?? 0;
+
+            if (typeof window._tickRound === "undefined") window._tickRound = state.roundNumber ?? 0;
+            if ((state.roundNumber ?? 0) !== window._tickRound) {
+                tickedThisRound = false;
+                window._tickRound = (state.roundNumber ?? 0);
+            }
+
+            if (!timeUpSticky && (nowRound !== window._lastRoundSeen || state.phase === "lobby" || state.phase === "armed")) {
+                if (statusTimeoutId) clearTimeout(statusTimeoutId);
+                showRoomCodeStatus();
+                window._lastRoundSeen = nowRound;
+            }
+
+            phaseEl.textContent = state.phase;
+            phaseEl.className = state.phase === "armed" ? "ok" : "muted";
+
+            membersEl.textContent = String(state.tablesChosenCount ?? 0);
+            hostTimerState = {
+                value: Number(state.remainingMs || 0),
+                updatedAt: performance.now(),
+                running: Boolean(state.timerRunning)
+            };
+
+            hostAnswerTimerState = {
+                value: Number(state.answerRemainingMs || 0),
+                updatedAt: performance.now(),
+                running: state.phase === "locked"
+            };
+
+            timeEl.textContent = formatMs(state.remainingMs);
+            answerTimeEl.textContent = formatMs(state.answerRemainingMs);
+
+            updateTimerWarning(state.remainingMs, state.phase);
+
+            if (!tickedThisRound && state.phase === "armed" && state.remainingMs <= 3000 && state.remainingMs > 2800) {
+                tickedThisRound = true;
+                tickAudio.currentTime = 0;
+                tickAudio.play().catch(() => { });
+            }
+
+            runningEl.textContent = state.timerRunning ? "yes" : "no";
+            runningEl.className = state.timerRunning ? "ok" : "muted";
+
+            teamCountSel.value = String(state.teams.length);
+            durationInput.value = String(Math.round(state.durationMs / 1000));
+
+            if (!state.lastBuzz) {
+                lastBuzzEl.textContent = "—";
+                lastBuzzEl.className = "muted";
+            } else {
+                const name = teamNameFromState(state, state.lastBuzz.teamId);
+                const isFirst = state.firstBuzzTeamId && String(state.firstBuzzTeamId) === String(state.lastBuzz.teamId);
+
+                lastBuzzEl.textContent = isFirst
+                    ? `${name} buzzed first`
+                    : `${name} buzzed`;
+
+                lastBuzzEl.className = "ok";
+            }
+
+            beepStartBtn.classList.toggle("isArmed", state.phase === "armed");
+
+            const sbKey = JSON.stringify({
+                teams: (state.teams || []).map(t => [t.id, t.name, t.score]),
+                lockedOut: state.lockedOutTeams || [],
+                falseStart: state.falseStartTeams || [],
+                taken: (state.takenTeams || []).map(x => [x.teamId, x.playerId]),
+                focus: state.focusLockedTeams || [],
+            });
+
+            if (sbKey !== lastScoreboardKey) {
+                lastScoreboardKey = sbKey;
+                renderScoreboard(state.teams, state.lockedOutTeams, state.takenTeams, state.focusLockedTeams, state.falseStartTeams);
+            }
+
+        });
+    </script>
+</body>
+
+</html>
